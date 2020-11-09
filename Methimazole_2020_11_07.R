@@ -1,4 +1,3 @@
-
 # ##서울대병원 메티마졸 - 오서진
 # 
 
@@ -248,7 +247,7 @@ WHERE m.drug_exposure_start_date BETWEEN (mmzcar5.drug_exposure_start_date) AND 
 group by atc_cd
 " -> sql
 
-mmzcar6 <- dbGetQuery(con, render(translate(sql, targetDialect = mydbtype), schema = myschemaname, class1a = class1a))
+mmzcar6 <- dbGetQuery(con, render(translate(sql, targetDialect = mydbtype), schema = myschemaname))
 
 # 췌장염 약물 공변량 class 1A
 
@@ -1004,8 +1003,6 @@ data$avgheight <- as.numeric(data$avgheight)
 write.csv(data, "data.csv", row.names = FALSE)
 write.csv(measurement_mild, "measurement_mild.csv", row.names = FALSE)
 write.csv(measurement_severe, "measurement_severe.csv", row.names = FALSE)
-write.csv(mildcohort_data, "mildcohort_data.csv", row.names = FALSE)
-write.csv(extremecohort_data, "extremecohort_data.csv", row.names = FALSE)
 write.csv(mildepisode, "mildepisode.csv", row.names = FALSE)
 write.csv(severeepisode, "severeepisode.csv", row.names = FALSE)
 write.csv(measurementtotal, "measurementtotal.csv", row.names = FALSE)
@@ -1032,7 +1029,7 @@ summary(fit.coxph_mild)
 summary(fit.coxph_severe)
 
 ggforest(fit.coxph_mild, data = data)
-ggforest(fit.coxph_extreme, data = data)
+ggforest(fit.coxph_severe, data = data)
 
 # Hazard Ratio(HR)는 상대적 위험도이므로, 그 위험비는 항상 reference에 대한 특정값임
 # HR > 1 (이벤트 발생 위험 증가), HR < 1 (이벤트 발생 위험 감소)
@@ -1040,4 +1037,8 @@ ggforest(fit.coxph_extreme, data = data)
 # 
 # *Treatment A는 reference로 사용됨
 
+model <- glm(mildevent ~ sex + age_group_2 + bmi + 
+               class1a + class1b + class2 + cci_score + tgmax, 
+             data = data, family = "binomial")
+summary(model)
 
