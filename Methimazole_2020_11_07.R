@@ -24,7 +24,7 @@ myschemaname = ""      # schema name
 myhost = ""      # db host
 myport =                # db port
 myuserid = "" # db id
-mypassword = "!"         #password
+mypassword = ""         #password
 myvocabschemaname=""   # OMOP CDM vocabulary schema name
 
 drv = dbDriver("PostgreSQL") # "MySQL", "PostgreSQL", "RSQLite"
