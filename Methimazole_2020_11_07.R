@@ -4,7 +4,7 @@
 # 필요한 패키지 설치하기 -------------------------------------------------------------------
 wants <- c("DatabaseConnector", "moonBook", "SqlRender", "RPostgreSQL", 
            "lubridate", "RDocumentation", "tidyverse", "lubridate", "readxl", 
-           "survival", "survminer", "dplyr", "ggplot2", "ggthemes")
+           "survival", "survminer", "dplyr", "ggplot2", "ggthemes", "pander")
 
 has <- wants %in% rownames(installed.packages())
 
@@ -45,11 +45,11 @@ total <- c(1504672, 19107525, 19040608, 19006936)
 
 # ATC Code
 #class1a <- c('C02AB', 'A07EC03', 'C10AB02', 'N03AX24', 'H03BB01', 'N02AA08', 'L01BC01', 'L01BC01', 'J04BA02', 'C09AA02',
-#'C03CA01', 'J04AC01', 'A07EC02', 'J01XD01', 'P01CX01', 'C10AA03', 'C01BA02', 'A11HA02', 'C10AA01',
-#'P01CB02', 'J01EC01', 'M01AB02', 'D06AA04', 'N03AG01')
+'C03CA01', 'J04AC01', 'A07EC02', 'J01XD01', 'P01CX01', 'C10AA03', 'C01BA02', 'A11HA02', 'C10AA01',
+'P01CB02', 'J01EC01', 'M01AB02', 'D06AA04', 'N03AG01')
 
 #class1b <- c('L01XX14', 'C01BD01', 'L04AX01', 'G03GB02', 'S01BA01', 'L01AA06', 'J05AF05', 'C09CA01', 'G03AC02',
-#'G03CA01', 'L01BB02', 'H03BB02', 'J05AE04', 'G03AC01', 'A02BC01', 'G03CA57', 'J01EE01')
+'G03CA01', 'L01BB02', 'H03BB02', 'J05AE04', 'G03AC01', 'A02BC01', 'G03CA57', 'J01EE01')
 
 #class2 <- c('N02BE01', 'C03AA04', 'N05AH02', 'J05AF02', 'D10AF02', 'G03C', 'L01XX02', 'L01XX24', 'N01AX10', 'L02BA01')
 
@@ -59,7 +59,6 @@ amylase <- c(3016771)
 lipase <- c(3004905)
 ast <- c(3042781)
 alt <- c(3006923)
-total_bilirubin <- c(3028833)
 weight <- c(3013762)
 height <- c(3015514)
 
@@ -78,6 +77,8 @@ ORDER BY person_id, drug_exposure_start_date, drug_exposure_end_date;
 " -> sql
 
 mmzcar <- dbGetQuery(con, render(translate(sql, targetDialect = mydbtype), schema = myschemaname, total = total))
+head(mmzcar)
+tail(mmzcar)
 
 
 # CDM 상 첫 mmz 처방일 (서울대병원 기준 -  "2004-10-14")
@@ -88,6 +89,7 @@ WHERE drug_concept_id in (@total)
 " -> sql
 firstdate <- dbGetQuery(con, render(translate(sql, targetDialect = mydbtype), schema = myschemaname, total = total))
 firstdate[1,]
+class(firstdate[1,])
 
 # 첫 6개월 간 처방된 기록이 있는 사람 제외 (washout period)
 # cohort 시작일 : 첫 mmz 처방일 + 6개월 (서울대병원 기준 - "2005-04-14")
@@ -238,62 +240,112 @@ dbWriteTable(conn = con,
              name = "mmzcar5", 
              value = mmzcar5)
 
-"select atc_cd, count(distinct(episode)) from mmzcar5
-inner join (select * from @schema.drug_exposure where atc_cd in ('C02AB', 'A07EC03', 'C10AB02', 'N03AX24', 'H03BB01', 'N02AA08', 'L01BC01', 'L01BC01', 'J04BA02', 'C09AA02',
-             'C03CA01', 'J04AC01', 'A07EC02', 'J01XD01', 'P01CX01', 'C10AA03', 'C01BA02', 'A11HA02', 'C10AA01',
-             'P01CB02', 'J01EC01', 'M01AB02', 'D06AA04', 'N03AG01')) m
-on mmzcar5.person_id = m.person_id
-WHERE m.drug_exposure_start_date BETWEEN (mmzcar5.drug_exposure_start_date) AND (mmzcar5.drug_exposure_end_date)
-group by atc_cd
-" -> sql
-
-mmzcar6 <- dbGetQuery(con, render(translate(sql, targetDialect = mydbtype), schema = myschemaname))
-
 # 췌장염 약물 공변량 class 1A
+
+# atc_cd
+
+# "select mmzcar5.episode, mmzcar5.drug_exposure_id, mmzcar5.person_id, mmzcar5.drug_concept_id,
+# mmzcar5.drug_exposure_start_date, mmzcar5.drug_exposure_end_date, mmzcar5.total_quantity,
+# mmzcar5.gender_source_value, mmzcar5.age_at_drug_exposure_start_date, mmzcar5.avgweight,
+# mmzcar5.avgheight, mmzcar5.bmi, m.drug_concept_id as class1a_drug_concept_id, m.atc_cd
+# from mmzcar5
+# left join (select * from @schema.drug_exposure where atc_cd in ('C02AB', 'A07EC03', 'C10AB02', 'N03AX24', 'H03BB01', 'N02AA08', 'L01BC01', 'L01BC01', 'J04BA02', 'C09AA02',
+#              'C03CA01', 'J04AC01', 'A07EC02', 'J01XD01', 'P01CX01', 'C10AA03', 'C01BA02', 'A11HA02', 'C10AA01',
+#              'P01CB02', 'J01EC01', 'M01AB02', 'D06AA04', 'N03AG01')) m
+# on mmzcar5.person_id = m.person_id
+# WHERE m.drug_exposure_start_date BETWEEN (mmzcar5.drug_exposure_start_date) AND (mmzcar5.drug_exposure_end_date)
+# ORDER BY episode, atc_cd
+# " -> sql
+# 
+# mmzcar7 <- dbGetQuery(con, render(translate(sql, targetDialect = mydbtype), schema = myschemaname))
+
+#drug_concept_id
 
 "select mmzcar5.episode, mmzcar5.drug_exposure_id, mmzcar5.person_id, mmzcar5.drug_concept_id,
 mmzcar5.drug_exposure_start_date, mmzcar5.drug_exposure_end_date, mmzcar5.total_quantity,
 mmzcar5.gender_source_value, mmzcar5.age_at_drug_exposure_start_date, mmzcar5.avgweight,
 mmzcar5.avgheight, mmzcar5.bmi, m.drug_concept_id as class1a_drug_concept_id, m.atc_cd
 from mmzcar5
-left join (select * from @schema.drug_exposure where atc_cd in ('C02AB', 'A07EC03', 'C10AB02', 'N03AX24', 'H03BB01', 'N02AA08', 'L01BC01', 'L01BC01', 'J04BA02', 'C09AA02',
-             'C03CA01', 'J04AC01', 'A07EC02', 'J01XD01', 'P01CX01', 'C10AA03', 'C01BA02', 'A11HA02', 'C10AA01',
-             'P01CB02', 'J01EC01', 'M01AB02', 'D06AA04', 'N03AG01')) m
+left join (select * from @schema.drug_exposure where drug_concept_id in 
+('968429','1707348','1236610','957136','40238238','1311104','1311078','41301497','19064967','1353578','19078859','968465','19061326','19022174',
+'19080187','19022104','44084557','19022959','40175400','40165762','35603226','40237529','44032873','1782573','40165789','42481598',
+'1711792','40175390','40238246','41051797','1539407','968467','40175394','41242653','36884836','1236611','40864885','40959912',
+'44135259','43645162','40958344','1539411','43278193','41240556')) m
+
 on mmzcar5.person_id = m.person_id
 WHERE m.drug_exposure_start_date BETWEEN (mmzcar5.drug_exposure_start_date) AND (mmzcar5.drug_exposure_end_date)
-ORDER BY episode, atc_cd
+ORDER BY episode, drug_concept_id
 " -> sql
 
 mmzcar7 <- dbGetQuery(con, render(translate(sql, targetDialect = mydbtype), schema = myschemaname))
 
+
+
 # 췌장염 약물 공변량 class 1B drug
+
+#atc_cd
+
+# "select mmzcar5.episode, mmzcar5.drug_exposure_id, mmzcar5.person_id, mmzcar5.drug_concept_id,
+# mmzcar5.drug_exposure_start_date, mmzcar5.drug_exposure_end_date, mmzcar5.total_quantity,
+# mmzcar5.gender_source_value, mmzcar5.age_at_drug_exposure_start_date, mmzcar5.avgweight,
+# mmzcar5.avgheight, mmzcar5.bmi, m.drug_concept_id as class1b_drug_concept_id, m.atc_cd
+# from mmzcar5
+# left join (select * from @schema.drug_exposure where atc_cd in ('L01XX14', 'C01BD01', 'L04AX01', 'G03GB02', 'S01BA01', 'L01AA06', 'J05AF05', 
+#             'C09CA01', 'G03AC02', 'G03CA01', 'L01BB02', 'H03BB02', 'J05AE04', 'G03AC01', 'A02BC01', 'G03CA57', 'J01EE01')) m
+# on mmzcar5.person_id = m.person_id
+# WHERE m.drug_exposure_start_date BETWEEN (mmzcar5.drug_exposure_start_date) AND (mmzcar5.drug_exposure_end_date)
+# ORDER BY episode, atc_cd
+# " -> sql
+
+# mmzcar8 <- dbGetQuery(con, render(translate(sql, targetDialect = mydbtype), schema = myschemaname))
 
 "select mmzcar5.episode, mmzcar5.drug_exposure_id, mmzcar5.person_id, mmzcar5.drug_concept_id,
 mmzcar5.drug_exposure_start_date, mmzcar5.drug_exposure_end_date, mmzcar5.total_quantity,
 mmzcar5.gender_source_value, mmzcar5.age_at_drug_exposure_start_date, mmzcar5.avgweight,
 mmzcar5.avgheight, mmzcar5.bmi, m.drug_concept_id as class1b_drug_concept_id, m.atc_cd
 from mmzcar5
-left join (select * from @schema.drug_exposure where atc_cd in ('L01XX14', 'C01BD01', 'L04AX01', 'G03GB02', 'S01BA01', 'L01AA06', 'J05AF05', 
-            'C09CA01', 'G03AC02', 'G03CA01', 'L01BB02', 'H03BB02', 'J05AE04', 'G03AC01', 'A02BC01', 'G03CA57', 'J01EE01')) m
+left join (select * from @schema.drug_exposure where drug_concept_id in ('1436651','903649','19029028','36895264','40220483','19101742',
+'1719010','1836433','1309992','40185276','1704186','19101743','19018977',
+'19077125','19014880','40185304','42628951','40236647')) m
 on mmzcar5.person_id = m.person_id
 WHERE m.drug_exposure_start_date BETWEEN (mmzcar5.drug_exposure_start_date) AND (mmzcar5.drug_exposure_end_date)
-ORDER BY episode, atc_cd
+ORDER BY episode, drug_concept_id
 " -> sql
 
 mmzcar8 <- dbGetQuery(con, render(translate(sql, targetDialect = mydbtype), schema = myschemaname))
 
+
+
+
 # 췌장염 약물 공변량 class 2 drug
+
+# "select mmzcar5.episode, mmzcar5.drug_exposure_id, mmzcar5.person_id, mmzcar5.drug_concept_id,
+# mmzcar5.drug_exposure_start_date, mmzcar5.drug_exposure_end_date, mmzcar5.total_quantity,
+# mmzcar5.gender_source_value, mmzcar5.age_at_drug_exposure_start_date, mmzcar5.avgweight,
+# mmzcar5.avgheight, mmzcar5.bmi, m.drug_concept_id as class2_drug_concept_id, m.atc_cd
+# from mmzcar5
+# left join (select * from @schema.drug_exposure where atc_cd in ('N02BE01', 'C03AA04', 'N05AH02', 'J05AF02', 'D10AF02', 'G03C', 'L01XX02', 
+#             'L01XX24', 'N01AX10', 'L02BA01')) m
+# on mmzcar5.person_id = m.person_id
+# WHERE m.drug_exposure_start_date BETWEEN (mmzcar5.drug_exposure_start_date) AND (mmzcar5.drug_exposure_end_date)
+# ORDER BY episode, atc_cd
+# 
+# " -> sql
+# 
+# mmzcar9 <- dbGetQuery(con, render(translate(sql, targetDialect = mydbtype), schema = myschemaname))
 
 "select mmzcar5.episode, mmzcar5.drug_exposure_id, mmzcar5.person_id, mmzcar5.drug_concept_id,
 mmzcar5.drug_exposure_start_date, mmzcar5.drug_exposure_end_date, mmzcar5.total_quantity,
 mmzcar5.gender_source_value, mmzcar5.age_at_drug_exposure_start_date, mmzcar5.avgweight,
 mmzcar5.avgheight, mmzcar5.bmi, m.drug_concept_id as class2_drug_concept_id, m.atc_cd
 from mmzcar5
-left join (select * from @schema.drug_exposure where atc_cd in ('N02BE01', 'C03AA04', 'N05AH02', 'J05AF02', 'D10AF02', 'G03C', 'L01XX02', 
-            'L01XX24', 'N01AX10', 'L02BA01')) m
+left join (select * from @schema.drug_exposure where drug_concept_id in ('43863992','800881','19072235','1724919',
+'19072157','1127078','21090567','40220393','1436683','800892',
+'800921','40220876','19072176','19021146','19084909','19075608',
+'40220389','19019851','19096574','21021955')) m
 on mmzcar5.person_id = m.person_id
 WHERE m.drug_exposure_start_date BETWEEN (mmzcar5.drug_exposure_start_date) AND (mmzcar5.drug_exposure_end_date)
-ORDER BY episode, atc_cd
+ORDER BY episode, drug_concept_id
 
 " -> sql
 
@@ -307,24 +359,23 @@ mmzcar5$class2 = rep(0,nrow(mmzcar5))
 
 for (i in 1:ep) {if (i %in% mmzcar7$episode) {
   temp = mmzcar7 %>% filter(mmzcar7$episode == i)
-  mmzcar5[i,]$class1a = length(unique(temp$atc_cd))}
+  mmzcar5[i,]$class1a = length(unique(temp$drug_concept_id))}
   else {mmzcar5[i,]$class1a = 0}}
 
 # class 1b
 
 for (i in 1:ep) {if (i %in% mmzcar8$episode) {
   temp = mmzcar8 %>% filter(mmzcar8$episode == i)
-  mmzcar5[i,]$class1b = length(unique(temp$atc_cd))}
+  mmzcar5[i,]$class1b = length(unique(temp$drug_concept_id))}
   else {mmzcar5[i,]$class1b = 0}}
 
 # class 2
 
 for (i in 1:ep) {if (i %in% mmzcar9$episode) {
   temp = mmzcar9 %>% filter(mmzcar9$episode == i)
-  mmzcar5[i,]$class2 = length(unique(temp$atc_cd))}
+  mmzcar5[i,]$class2 = length(unique(temp$drug_concept_id))}
   else {mmzcar5[i,]$class2 = 0}}
 
-# 췌장염 약물 공변량 class 2 drug
 
 # Charlson Comorbidity Index (CCI code)
 ## weight 1
@@ -924,6 +975,12 @@ data <- pancalcgalamylipex
 
 ### DATA PREP FOR SURVIVAL ANALYSIS
 
+data$bmi <- as.numeric(data$bmi)
+data$tgmax <- as.numeric(data$tgmax)
+data$avgweight <- as.numeric(data$avgweight)
+data$avgheight <- as.numeric(data$avgheight)
+
+
 data <- data %>% mutate(age_group = ifelse (age_at_drug_exposure_start_date >= 90, "90 -", 
                                             ifelse(age_at_drug_exposure_start_date >= 80, "80 - 89",
                                                    ifelse(age_at_drug_exposure_start_date >= 70, "70 - 79",
@@ -946,6 +1003,19 @@ data <- data %>% mutate(age_group_3 = ifelse (age_at_drug_exposure_start_date >=
                                                      ifelse(age_at_drug_exposure_start_date >= 20, "20 - 39",
                                                             "0 - 19"))))
 data$age_group_3 <- factor(data$age_group_3)
+
+data <- data %>% mutate(tgmax_group = ifelse(is.na(tgmax) == TRUE, NA, ifelse (tgmax >= 1000, "over 1000",
+                                                              ifelse(tgmax >= 200, "200 - 1000", "under 200"))))
+data$tgmax_group <- factor(data$tgmax_group)
+
+data <- data %>% mutate(bmi_group = ifelse (is.na(bmi) == TRUE ,NA, ifelse (bmi >= 30, "Obese",
+                                              ifelse(bmi >= 25, "Overweight", 
+                                                     ifelse(bmi >= 18.5, "Normal", "Underweight")))))
+
+
+data$bmi_group <- factor(data$bmi_group)
+
+
 data <- data %>% mutate(mildevent = ifelse (episode %in% mildepisode$episode, 1, 0))
 data <- data %>% mutate(severeevent = ifelse (episode %in% severeepisode$episode, 1, 0))
 
@@ -954,6 +1024,8 @@ severe_event_date <- as.Date(0, origin = "1900-01-01")
 
 data <- cbind(data, mild_event_date, severe_event_date)
 data$episode <- as.integer(data$episode)
+
+str(data)
 
 for (i in mildepisode$episode) {
     temp <- measurement_mild %>% subset(measurement_mild$episode == i)
@@ -977,7 +1049,7 @@ data['days_before_severe_event'] <- NA
 
 for (i in data$episode) {
   temp <- data %>% subset(data$episode == i)
-  d = ifelse (temp$mild_event_date != "1900-01-01", 
+  d = ifelse (temp$mildevent == 1, 
               (temp$mild_event_date - temp$drug_exposure_start_date), 
               (temp$drug_exposure_end_date - temp$drug_exposure_start_date))
   data[match(i,data$episode),]$days_before_mild_event = d
@@ -985,18 +1057,11 @@ for (i in data$episode) {
 
 for (i in data$episode) {
   temp <- data %>% subset(data$episode == i)
-  d = ifelse (temp$severe_event_date != "1900-01-01", 
+  d = ifelse (temp$severeevent == 1, 
               (temp$severe_event_date - temp$drug_exposure_start_date), 
               (temp$drug_exposure_end_date - temp$drug_exposure_start_date))
   data[match(i,data$episode),]$days_before_severe_event = d
 }
-
-summary(data)
-str(data)
-data$bmi <- as.numeric(data$bmi)
-data$tgmax <- as.numeric(data$tgmax)
-data$avgweight <- as.numeric(data$avgweight)
-data$avgheight <- as.numeric(data$avgheight)
 
 ##################################################################################
 
@@ -1009,36 +1074,5 @@ write.csv(measurementtotal, "measurementtotal.csv", row.names = FALSE)
 write.csv(mildmeasurementid, "mildmeasurementid.csv", row.names = FALSE)
 write.csv(severemeasurementid, "severemeasurementid.csv", row.names = FALSE)
 
-
 ##############################################################################
-
-#####SURVIVAL ANALYSIS ###################################
-
-summary(data)
-surv_object_mild <- Surv(time = data$days_before_mild_event, event = data$mildevent)
-surv_object_severe <- Surv(time = data$days_before_severe_event, event = data$severeevent)
-
-fit.coxph_mild <- coxph(surv_object_mild ~ sex + age_group_2 + bmi + class1a + 
-                          class1b + class2 + cci_score + tgmax, data = data)
-
-fit.coxph_severe <- coxph(surv_object_severe ~ sex + age_group_2 + bmi + 
-                           class1a + class1b + class2 + cci_score + tgmax, 
-                           data = data)
-
-summary(fit.coxph_mild)
-summary(fit.coxph_severe)
-
-ggforest(fit.coxph_mild, data = data)
-ggforest(fit.coxph_severe, data = data)
-
-# Hazard Ratio(HR)는 상대적 위험도이므로, 그 위험비는 항상 reference에 대한 특정값임
-# HR > 1 (이벤트 발생 위험 증가), HR < 1 (이벤트 발생 위험 감소)
-# 위 그림에서 0.85 는 Treatment B를 받은 환자들이 Treatment A를 받은 환자들에 비해 사건 발생률이 0.85배로 감소했다는 의미
-# 
-# *Treatment A는 reference로 사용됨
-
-model <- glm(mildevent ~ sex + age_group_2 + bmi + 
-               class1a + class1b + class2 + cci_score + tgmax, 
-             data = data, family = "binomial")
-summary(model)
 
