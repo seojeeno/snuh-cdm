@@ -20,12 +20,12 @@ rm(has, wants)
 rm(list = ls())
 mydbtype= "postgresql"      # db type: "postgresql", "oracle", "pdw", "redshift", "impala", "netezza", "bigquery", "redshift", "sqlite", "mssql", "sql server"
 mydbname = "postgres"      # database name
-myschemaname = "cdm"      # schema name
-myhost = "172.23.100.123"      # db host
-myport = 1335               # db port
-myuserid = "cdmreader" # db id
-mypassword = "cdmRead2r!"         #password
-myvocabschemaname="cdm"   # OMOP CDM vocabulary schema name
+myschemaname = ""      # schema name
+myhost = ""      # db host
+myport =                # db port
+myuserid = "" # db id
+mypassword = "!"         #password
+myvocabschemaname=""   # OMOP CDM vocabulary schema name
 
 drv = dbDriver("PostgreSQL") # "MySQL", "PostgreSQL", "RSQLite"
 con = dbConnect(drv,
